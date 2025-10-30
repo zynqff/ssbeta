@@ -1,0 +1,18 @@
+<h1>Привет, {{ current_user.username }}!</h1>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <p style="color: {{ 'green' if category == 'success' else 'red' }};">{{ message }}</p>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<form method="POST">
+    <h3>Ваша личная информация (видна только вам):</h3>
+    <textarea name="user_data" rows="5" cols="50">{{ user_data }}</textarea><br><br>
+    <button type="submit">Сохранить изменения</button>
+</form>
+
+<p><a href="{{ url_for('logout') }}">Выйти из системы</a></p>
+<p><a href="{{ url_for('index') }}">На главную</a></p>
