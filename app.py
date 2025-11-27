@@ -104,10 +104,11 @@ def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 def initialize_db_data():
-    """Создает БД, восстанавливает ваш аккаунт и стихи."""
+    """
+    Создает БД и заполняет ее стихами и администратором.
+    Эта функция должна быть вызвана при запуске.
+    """
     with app.app_context():
-        # Важно: для добавления нового поля (show_all_tab) может потребоваться 
-        # удалить старый файл database.db. 
         db.create_all()
 
         # --- 1. ВАШ АККАУНТ АДМИНИСТРАТОРА ---
@@ -176,27 +177,26 @@ def index():
     read_titles = []
     pinned_title = None 
     is_admin = False
-    show_all_tab = False # НОВОЕ
+    show_all_tab = False 
     
     if current_user.is_authenticated:
         read_titles = current_user.read_poems_titles
         pinned_title = current_user.pinned_poem_title 
         is_admin = current_user.is_admin
-        show_all_tab = current_user.show_all_tab # НОВОЕ: Загружаем настройку
+        show_all_tab = current_user.show_all_tab 
     
     return render_template('index.html', 
                            poems=serialized_poems,
                            read_titles=read_titles,
                            pinned_title=pinned_title, 
                            is_admin=is_admin,
-                           show_all_tab=show_all_tab) # НОВОЕ: Передаем настройку
+                           show_all_tab=show_all_tab) 
 
 
 @app.route('/toggle_read', methods=['POST'])
 @login_required
 def toggle_read():
     """Маршрут для переключения состояния 'прочитано/не прочитано' (через AJAX)."""
-    # ... (Оставляем как есть)
     data = request.get_json()
     poem_title = data.get('title')
     
@@ -220,7 +220,6 @@ def toggle_read():
 @login_required
 def toggle_pin():
     """Переключает статус изучаемого стиха (закреплен/откреплен) (через AJAX)."""
-    # ... (Оставляем как есть)
     data = request.get_json()
     poem_title = data.get('title')
     
@@ -245,7 +244,6 @@ def toggle_pin():
 @app.route('/delete_poem/<string:title>', methods=['POST'])
 @login_required
 def delete_poem(title):
-    # ... (Оставляем как есть)
     if not current_user.is_admin:
         return jsonify({"success": False, "message": "Доступ запрещен. Требуются права администратора."}), 403
         
@@ -256,13 +254,11 @@ def delete_poem(title):
     try:
         # Удаляем стих из списка прочитанных и закрепленных у всех пользователей
         for user in User.query.all():
-            # Удаление из прочитанных
             if user.is_poem_read(title):
                 current_reads = user.read_poems_titles
                 current_reads.remove(title)
                 user.read_poems_titles = current_reads
                 
-            # Открепление, если был закреплен
             if user.pinned_poem_title == title:
                 user.pinned_poem_title = None
                 
@@ -278,7 +274,6 @@ def delete_poem(title):
 @app.route('/add_poem', methods=['GET', 'POST'])
 @login_required
 def add_poem():
-    # ... (Оставляем как есть)
     if not current_user.is_admin:
         flash('Доступ запрещен. Эта страница только для администраторов.', 'error')
         return redirect(url_for('index'))
@@ -309,7 +304,6 @@ def add_poem():
 @app.route('/edit_poem/<string:title>', methods=['GET', 'POST'])
 @login_required
 def edit_poem(title):
-    # ... (Оставляем как есть)
     if not current_user.is_admin:
         flash('Доступ запрещен. Эта страница только для администраторов.', 'error')
         return redirect(url_for('index'))
@@ -329,21 +323,17 @@ def edit_poem(title):
             return redirect(url_for('edit_poem', title=title)) 
 
         if new_title != title:
-            # Проверяем, существует ли стих с новым названием
             if Poem.query.get(new_title):
                 flash(f'Стих с новым названием "{new_title}" уже существует.', 'error')
                 return redirect(url_for('edit_poem', title=title))
             
-            # Если название изменилось, создаем новый объект и удаляем старый
             for user in User.query.all():
-                # Обновление прочитанных
                 if user.is_poem_read(title):
                     current_reads = user.read_poems_titles
                     current_reads.remove(title)
                     current_reads.append(new_title)
                     user.read_poems_titles = current_reads
                 
-                # Обновление закрепленного
                 if user.pinned_poem_title == title:
                     user.pinned_poem_title = new_title
                     
@@ -354,7 +344,6 @@ def edit_poem(title):
             db.session.add(new_poem_obj)
 
         else:
-            # Если название не менялось, просто обновляем поля
             poem.author = new_author
             poem.text = new_text
         
@@ -368,7 +357,6 @@ def edit_poem(title):
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    # ... (Оставляем как есть)
     if current_user.is_authenticated:
         return redirect(url_for('profile'))
         
@@ -396,7 +384,6 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    # ... (Оставляем как есть)
     if current_user.is_authenticated:
         return redirect(url_for('profile'))
         
@@ -431,16 +418,13 @@ def profile():
             flash('Пароль успешно изменён!', 'success')
             return redirect(url_for('profile'))
         
-        # --- 2. Обработка обновления личных данных и настроек (ОБНОВЛЕНО) ---
+        # --- 2. Обработка обновления личных данных и настроек ---
         new_data = request.form.get('user_data')
-        
-        # НОВОЕ: Чтение состояния чекбокса
         show_all = request.form.get('show_all_tab') == 'on' 
         
         if new_data is not None:
             current_user.user_data = new_data
         
-        # Сохранение новой настройки
         current_user.show_all_tab = show_all 
         
         db.session.commit()
@@ -449,18 +433,19 @@ def profile():
 
     return render_template('profile.html', 
                            user_data=current_user.user_data,
-                           show_all_tab=current_user.show_all_tab) # НОВОЕ: Передаем настройку
+                           show_all_tab=current_user.show_all_tab) 
 
 @app.route('/logout')
 @login_required
 def logout():
-    # ... (Оставляем как есть)
     logout_user()
     flash('Вы успешно вышли из системы.', 'success')
     return redirect(url_for('index'))
 
 
-# --- 5. ЗАПУСК ---
+# --- 5. ЗАПУСК (Инициализация только для локального dev-режима) ---
 if __name__ == '__main__':
-    initialize_db_data() # Вызываем функцию, которая создаст БД и заполнит данными
+    # Эта функция вызывается только при локальном запуске (python app.py)
+    # На Render/Gunicorn она будет вызвана через команду запуска.
+    initialize_db_data() 
     app.run(debug=True)
