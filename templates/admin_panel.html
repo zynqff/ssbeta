@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Панель Администратора</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            color: #374151;
+        }
+
+        .modal {
+            transition: opacity 0.3s ease-in-out;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .modal.open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .poem-text {
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .sortable:hover {
+            cursor: pointer;
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <header class="flex flex-col sm:flex-row justify-between items-center py-4 mb-8 border-b border-gray-200">
+            <h1 class="text-3xl font-extrabold text-red-600 mb-4 sm:mb-0">Панель Управления Стихами</h1>
+            <nav class="flex items-center space-x-4">
+                <a href="{{ url_for('index') }}" class="text-sky-500 hover:text-sky-600 font-semibold">← На главную</a>
+            </nav>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div id="flash-messages" class="mb-4 space-y-2">
+            {% for category, message in messages %}
+            <div
+                class="p-3 text-sm rounded-lg shadow-sm {{ 'bg-green-100 text-green-700' if category == 'success' else 'bg-red-100 text-red-700' }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-200">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                <input type="search" id="search-input" placeholder="Поиск по названию, автору или тексту..."
+                    class="w-full md:w-2/3 px-4 py-3 border border-gray-300 rounded-xl focus:ring-sky-500 focus:border-sky-500 transition duration-150 text-lg mb-4 md:mb-0">
+
+                <button id="add-new-poem-btn"
+                    class="w-full md:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    + Добавить новый стих
+                </button>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+                    <thead>
+                        <tr class="text-left bg-gray-50 border-b border-gray-200 text-sm text-gray-700 uppercase">
+                            <th id="sort-title" data-sort="title" data-order="asc"
+                                class="sortable px-4 py-3 font-semibold rounded-tl-lg">Название
+                                <span class="title-order text-sky-500 ml-1">▲</span>
+                            </th>
+                            <th id="sort-author" data-sort="author" data-order="none"
+                                class="sortable px-4 py-3 font-semibold">Автор</th>
+                            <th id="sort-length" data-sort="length" data-order="none"
+                                class="sortable px-4 py-3 font-semibold text-center">Строк</th>
+                            <th class="px-4 py-3 font-semibold text-center rounded-tr-lg">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="poems-table-body" class="divide-y divide-gray-100">
+                    </tbody>
+                </table>
+                <p id="no-results-message" class="text-center text-lg text-gray-500 py-10 hidden">
+                    Стихов не найдено.
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="poem-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 transform scale-95 transition-transform duration-300"
+            id="modal-content">
+            <h2 id="modal-heading" class="text-2xl font-bold mb-6 text-gray-900 text-center"></h2>
+
+            <form id="poem-form">
+                <input type="hidden" id="original-title" name="original-title">
+
+                <div class="mb-4">
+                    <label for="title" class="block text-sm font-medium text-gray-700 mb-1">Название</label>
+                    <input type="text" id="title" name="title" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 transition duration-150">
+                </div>
+
+                <div class="mb-4">
+                    <label for="author" class="block text-sm font-medium text-gray-700 mb-1">Автор</label>
+                    <input type="text" id="author" name="author" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 transition duration-150">
+                </div>
+
+                <div class="mb-6">
+                    <label for="text" class="block text-sm font-medium text-gray-700 mb-1">Текст стиха</label>
+                    <textarea id="text" name="text" rows="10" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 transition duration-150"
+                        placeholder="Каждая строка должна быть отделена переводом строки."></textarea>
+                </div>
+
+                <button type="submit" id="modal-submit-btn"
+                    class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 rounded-lg transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
+                    Сохранить
+                </button>
+                <div id="modal-error" class="text-red-500 text-sm text-center mt-3 hidden"></div>
+            </form>
+
+            <button id="close-modal-btn"
+                class="absolute top-4 right-4 text-gray-500 hover:text-gray-900 transition-colors duration-150">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+
+    <script>
+        let allPoems = [];
+        let filteredPoems = [];
+        let isEditing = false; // Флаг для модального окна: true - редактирование, false - добавление
+        let currentSort = { type: 'title', order: 'asc' };
+
+        const searchInput = document.getElementById('search-input');
+        const poemsTableBody = document.getElementById('poems-table-body');
+        const noResultsMessage = document.getElementById('no-results-message');
+        const modal = document.getElementById('poem-modal');
+        const modalForm = document.getElementById('poem-form');
+        const modalHeading = document.getElementById('modal-heading');
+        const modalSubmitBtn = document.getElementById('modal-submit-btn');
+        const modalError = document.getElementById('modal-error');
+        const originalTitleInput = document.getElementById('original-title');
+
+
+        // --- UI ХЕЛПЕРЫ ---
+
+        function showMessage(message, category = 'success') {
+            const container = document.getElementById('flash-messages');
+            if (!container) return;
+
+            const div = document.createElement('div');
+            div.className = `p-3 text-sm rounded-lg shadow-sm ${category === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`;
+            div.textContent = message;
+            container.prepend(div);
+
+            // Автоматическое исчезновение через 5 секунд
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        function closeModal() {
+            modal.classList.remove('open');
+            modalForm.reset();
+            originalTitleInput.value = '';
+            modalError.classList.add('hidden');
+        }
+
+        function openModal(poem = null) {
+            modalForm.reset();
+            modalError.classList.add('hidden');
+
+            if (poem) {
+                isEditing = true;
+                modalHeading.textContent = `Редактировать: "${poem.title}"`;
+                modalSubmitBtn.textContent = 'Сохранить изменения';
+                document.getElementById('title').value = poem.title;
+                document.getElementById('author').value = poem.author;
+                document.getElementById('text').value = poem.text;
+                originalTitleInput.value = poem.title; // Сохраняем оригинальный заголовок
+            } else {
+                isEditing = false;
+                modalHeading.textContent = 'Добавить Новый Стих 📝';
+                modalSubmitBtn.textContent = 'Добавить стих';
+                originalTitleInput.value = '';
+            }
+
+            modal.classList.add('open');
+        }
+
+
+        // --- ФУНКЦИИ ТАБЛИЦЫ ---
+
+        function createTableRow(poem) {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50';
+            tr.dataset.title = poem.title;
+
+            tr.innerHTML = `
+                <td class="px-4 py-3 font-medium text-gray-900 break-words">${poem.title}</td>
+                <td class="px-4 py-3 text-gray-700">${poem.author}</td>
+                <td class="px-4 py-3 text-gray-700 text-center">${poem.lineCount}</td>
+                <td class="px-4 py-3 text-center whitespace-nowrap">
+                    <button data-title="${poem.title}" data-action="edit"
+                        class="text-yellow-600 hover:text-yellow-800 font-semibold px-3 py-1 rounded-lg transition-colors duration-150 text-sm">
+                        Редактировать
+                    </button>
+                    <button data-title="${poem.title}" data-action="delete"
+                        class="text-red-600 hover:text-red-800 font-semibold px-3 py-1 rounded-lg transition-colors duration-150 text-sm ml-2">
+                        Удалить
+                    </button>
+                </td>
+            `;
+            return tr;
+        }
+
+        function sortPoems(poems) {
+            poems.sort((a, b) => {
+                let valA, valB;
+
+                if (currentSort.type === 'length') {
+                    valA = a.lineCount;
+                    valB = b.lineCount;
+                } else { // title or author
+                    valA = a[currentSort.type].toLowerCase();
+                    valB = b[currentSort.type].toLowerCase();
+                }
+
+                if (valA < valB) return currentSort.order === 'asc' ? -1 : 1;
+                if (valA > valB) return currentSort.order === 'asc' ? 1 : -1;
+                return 0;
+            });
+            return poems;
+        }
+
+        function renderTable(poems) {
+            poemsTableBody.innerHTML = '';
+            if (poems.length === 0) {
+                noResultsMessage.classList.remove('hidden');
+            } else {
+                noResultsMessage.classList.add('hidden');
+                poems.forEach(poem => {
+                    poemsTableBody.appendChild(createTableRow(poem));
+                });
+            }
+        }
+
+        function filterAndRender() {
+            const searchText = searchInput.value.toLowerCase();
+
+            filteredPoems = allPoems.filter(poem => {
+                return poem.title.toLowerCase().includes(searchText) ||
+                    poem.author.toLowerCase().includes(searchText) ||
+                    poem.text.toLowerCase().includes(searchText);
+            });
+
+            const sortedPoems = sortPoems(filteredPoems);
+            renderTable(sortedPoems);
+        }
+
+        // --- ЗАГРУЗКА ДАННЫХ ---
+
+        async function loadPoems() {
+            try {
+                const response = await fetch("{{ url_for('get_all_poems_api') }}");
+                if (!response.ok) {
+                    throw new Error('Не удалось загрузить стихи.');
+                }
+                const data = await response.json();
+                allPoems = data.poems || [];
+                filterAndRender();
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                showMessage('Критическая ошибка: не удалось загрузить данные стихов.', 'error');
+            }
+        }
+
+        // --- AJAX CRUD ОПЕРАЦИИ ---
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            modalError.classList.add('hidden');
+            modalSubmitBtn.disabled = true;
+
+            const title = document.getElementById('title').value.trim();
+            const author = document.getElementById('author').value.trim();
+            const text = document.getElementById('text').value.trim();
+            const originalTitle = originalTitleInput.value;
+
+            if (!title || !author || !text) {
+                modalSubmitBtn.disabled = false;
+                return;
+            }
+
+            let url, method;
+
+            if (isEditing) {
+                // РЕДАКТИРОВАНИЕ
+                url = `{{ url_for('edit_poem', title='TEMP') }}`.replace('TEMP', encodeURIComponent(originalTitle));
+            } else {
+                // ДОБАВЛЕНИЕ
+                url = `{{ url_for('add_poem') }}`;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST', // Используем POST, но сервер будет знать, что это AJAX (JSON)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title, author, text })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const newPoem = data.poem;
+
+                    if (isEditing) {
+                        // 1. Находим и удаляем старую запись
+                        allPoems = allPoems.filter(p => p.title !== originalTitle);
+                        // 2. Добавляем обновленную запись
+                        allPoems.push(newPoem);
+                    } else {
+                        // Добавление: просто добавляем новый стих
+                        allPoems.push(newPoem);
+                    }
+
+                    showMessage(data.message, 'success');
+                    closeModal();
+                    filterAndRender(); // Перерисовываем таблицу
+                } else {
+                    modalError.textContent = data.message || 'Произошла ошибка на сервере.';
+                    modalError.classList.remove('hidden');
+                }
+            } catch (error) {
+                modalError.textContent = 'Сетевая ошибка. Проверьте соединение.';
+                modalError.classList.remove('hidden');
+            } finally {
+                modalSubmitBtn.disabled = false;
+            }
+        }
+
+        async function handleDelete(title) {
+            if (!confirm(`Вы уверены, что хотите удалить стих "${title}"? Это действие необратимо и удалит его у всех пользователей!`)) {
+                return;
+            }
+
+            const url = `/delete_poem/${encodeURIComponent(title)}`;
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+
+                if (response.ok) {
+                    allPoems = allPoems.filter(p => p.title !== title); // Удаляем из локального массива
+                    showMessage(`Стих "${title}" успешно удален.`, 'success');
+                    filterAndRender(); // Перерисовываем таблицу
+                } else {
+                    const errorData = await response.json();
+                    showMessage(`Ошибка при удалении: ${errorData.message}`, 'error');
+                }
+            } catch (error) {
+                showMessage('Сетевая ошибка при удалении.', 'error');
+            }
+        }
+
+        // --- ИНИЦИАЛИЗАЦИЯ ---
+
+        window.onload = () => {
+            loadPoems();
+
+            // Обработчики событий
+            document.getElementById('add-new-poem-btn').addEventListener('click', () => openModal());
+            document.getElementById('close-modal-btn').addEventListener('click', closeModal);
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeModal();
+            });
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && modal.classList.contains('open')) closeModal();
+            });
+
+            searchInput.addEventListener('input', filterAndRender);
+            modalForm.addEventListener('submit', handleSubmit);
+
+            // Обработчик кнопок таблицы (редактирование/удаление)
+            poemsTableBody.addEventListener('click', (e) => {
+                const targetBtn = e.target.closest('button[data-action]');
+                if (!targetBtn) return;
+
+                const title = targetBtn.dataset.title;
+                const poem = allPoems.find(p => p.title === title);
+
+                if (targetBtn.dataset.action === 'edit' && poem) {
+                    openModal(poem);
+                } else if (targetBtn.dataset.action === 'delete') {
+                    handleDelete(title);
+                }
+            });
+
+            // Обработчик сортировки заголовков
+            document.querySelectorAll('.sortable').forEach(header => {
+                header.addEventListener('click', () => {
+                    const sortType = header.dataset.sort;
+                    let sortOrder = header.dataset.order;
+
+                    // Если сортируем по тому же столбцу, меняем порядок
+                    if (currentSort.type === sortType) {
+                        sortOrder = (currentSort.order === 'asc' || currentSort.order === 'none') ? 'desc' : 'asc';
+                    } else {
+                        // Если новый столбец, устанавливаем asc по умолчанию
+                        sortOrder = 'asc';
+                    }
+
+                    // Обновляем текущее состояние сортировки
+                    currentSort = { type: sortType, order: sortOrder };
+
+                    // Обновляем UI для всех заголовков
+                    document.querySelectorAll('.sortable').forEach(h => {
+                        h.dataset.order = 'none'; // Сброс для всех
+                        h.querySelector('span') && h.querySelector('span').remove();
+                    });
+
+                    // Устанавливаем новый порядок и метку для текущего заголовка
+                    header.dataset.order = sortOrder;
+                    const orderSymbol = sortOrder === 'asc' ? '▲' : '▼';
+                    const orderSpan = document.createElement('span');
+                    orderSpan.className = `${sortType}-order text-sky-500 ml-1`;
+                    orderSpan.textContent = orderSymbol;
+                    header.appendChild(orderSpan);
+
+                    filterAndRender();
+                });
+            });
+        };
+    </script>
+</body>
+
+</html>

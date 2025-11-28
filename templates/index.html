@@ -74,9 +74,8 @@
                 {% if current_user.is_authenticated %}
                 {% if current_user.is_admin %}
                 <span class="text-red-600 font-bold">Администратор</span>
-                <a href="{{ url_for('add_poem') }}" class="text-sky-500 hover:text-sky-600 font-semibold">Добавить
-                    стих</a>
-                {% endif %}
+                <a href="{{ url_for('admin_panel') }}" class="text-red-600 hover:text-red-700 font-semibold">Панель
+                    админа</a> {% endif %}
                 <a href="{{ url_for('profile') }}" class="text-gray-700 hover:text-sky-600 font-semibold">Профиль ({{
                     current_user.username }})</a>
                 <a href="{{ url_for('logout') }}" class="text-gray-700 hover:text-sky-600 font-semibold">Выйти</a>
@@ -154,7 +153,7 @@
     <div id="poem-modal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
         <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8 transform scale-95 transition-transform duration-300"
             id="modal-content">
-            <h2 id="modal-title" class="text-3xl font-bold mb-2 text-gray-900 break-words"></h2>
+            <h2 id="modal-title" class="text-3xl font-bold mb-2 на text-gray-900 break-words"></h2>
             <p id="modal-author" class="text-lg text-gray-600 mb-4 italic"></p>
             <div class="h-px bg-gray-200 mb-6"></div>
 
@@ -187,15 +186,6 @@
                         </button>
                     </div>
                 </div>
-
-                {% if current_user.is_admin %}
-                <div id="admin-buttons" class="flex space-x-3">
-                    <a href="#" id="edit-poem-btn"
-                        class="hidden bg-yellow-500 hover:bg-yellow-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors duration-200 shadow-md text-sm">Редактировать</a>
-                    <button id="delete-poem-btn"
-                        class="hidden bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors duration-200 shadow-md text-sm">Удалить</button>
-                </div>
-                {% endif %}
             </div>
             {% endif %}
 
@@ -211,11 +201,13 @@
     <script>
         // ВАЖНО: Jinja2 вставляет сюда данные из Python!
         const allData = {{ poems | tojson }};
-        const readPoemsTitles = new Set({{ read_titles | tojson if current_user.is_authenticated else '[]' | safe }});
-        let pinnedPoemTitle = {{ pinned_title | tojson | safe }};
-        const isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
-        const isAdmin = {{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }};
-        const showAllTabSetting = {{ 'true' if current_user.is_authenticated and show_all_tab else 'false' }};
+
+        // ИСПРАВЛЕННЫЕ СТРОКИ: Булевы значения передаются как строки и преобразуются в JS-булевы
+        const readPoemsTitles = new Set({{ (read_titles if current_user.is_authenticated else[]) | tojson }});
+        let pinnedPoemTitle = {{ pinned_title | tojson }};
+        const isAuthenticated = "{{ 'true' if current_user.is_authenticated else 'false' }}" === 'true';
+        const isAdmin = "{{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }}" === 'true';
+        const showAllTabSetting = "{{ 'true' if current_user.is_authenticated and show_all_tab else 'false' }}" === 'true';
 
         // --- 1. ЛОГИКА ФИЛЬТРАЦИИ И СОРТИРОВКИ ---
 
@@ -360,7 +352,7 @@
             document.getElementById('count-read').textContent = readCount;
         };
 
-        // --- 2. ЛОГИКА МОДАЛЬНОГО ОКНА (Без изменений) ---
+        // --- 2. ЛОГИКА МОДАЛЬНОГО ОКНА ---
 
         const openModal = (title) => {
             currentPoem = allPoems.find(p => p.title === title);
@@ -371,9 +363,6 @@
             const modalText = document.getElementById('modal-text');
             const readButtonWrapper = document.getElementById('read-button-wrapper');
             const pinButtonWrapper = document.getElementById('pin-button-wrapper');
-            const editPoemBtn = document.getElementById('edit-poem-btn');
-            const deletePoemBtn = document.getElementById('delete-poem-btn');
-
 
             modalTitle.textContent = currentPoem.title;
             modalAuthor.textContent = `Автор: ${currentPoem.author}`;
@@ -389,15 +378,10 @@
                 if (readButtonWrapper) readButtonWrapper.classList.remove('hidden');
                 if (pinButtonWrapper) pinButtonWrapper.classList.remove('hidden');
 
-                if (isAdmin) {
-                    editPoemBtn.href = `/edit_poem/${encodeURIComponent(title)}`;
-                    editPoemBtn.classList.remove('hidden');
-                    deletePoemBtn.classList.remove('hidden');
-                }
+                // Админ-кнопки в модальном окне больше не показываются
             } else {
                 if (readButtonWrapper) readButtonWrapper.classList.add('hidden');
                 if (pinButtonWrapper) pinButtonWrapper.classList.add('hidden');
-                if (document.getElementById('admin-buttons')) document.getElementById('admin-buttons').classList.add('hidden');
             }
 
             modal.classList.add('open');
@@ -407,13 +391,9 @@
             modal.classList.remove('open');
             const readButtonWrapper = document.getElementById('read-button-wrapper');
             const pinButtonWrapper = document.getElementById('pin-button-wrapper');
-            const editPoemBtn = document.getElementById('edit-poem-btn');
-            const deletePoemBtn = document.getElementById('delete-poem-btn');
 
             if (readButtonWrapper) readButtonWrapper.classList.add('hidden');
             if (pinButtonWrapper) pinButtonWrapper.classList.add('hidden');
-            if (editPoemBtn) editPoemBtn.classList.add('hidden');
-            if (deletePoemBtn) deletePoemBtn.classList.add('hidden');
             currentPoem = null;
         };
 
@@ -510,10 +490,8 @@
 
                     if (data.action === 'pinned') {
                         pinnedPoemTitle = data.pinned_title;
-                        // alert(`Стих "${currentPoem.title}" теперь закреплен для изучения!`);
                     } else {
                         pinnedPoemTitle = null;
-                        // alert(`Стих "${currentPoem.title}" откреплен.`);
                     }
 
                     updateModalPinButton(currentPoem.title === pinnedPoemTitle);
@@ -528,41 +506,6 @@
                 console.error('Сетевая ошибка при переключении закрепления:', error);
             }
         };
-
-        const handleDeletePoem = async () => {
-            if (!currentPoem || !confirm(`Вы уверены, что хотите удалить стих "${currentPoem.title}"?`)) return;
-
-            const url = `/delete_poem/${encodeURIComponent(currentPoem.title)}`;
-
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                });
-
-                if (response.ok) {
-                    allPoems = allPoems.filter(p => p.title !== currentPoem.title);
-                    readPoemsTitles.delete(currentPoem.title);
-                    if (currentPoem.title === pinnedPoemTitle) {
-                        pinnedPoemTitle = null;
-                    }
-
-                    updateTabCounts();
-                    filterAndRender();
-                    closeModal();
-
-                    alert('Стих успешно удален!');
-                } else {
-                    const errorData = await response.json();
-                    console.error('Ошибка при удалении стиха:', errorData.message);
-                    alert(`Ошибка при удалении стиха: ${errorData.message}`);
-                }
-            } catch (error) {
-                console.error('Сетевая ошибка при удалении:', error);
-                alert('Сетевая ошибка при удалении.');
-            }
-        };
-
 
         // --- 3. ОБРАБОТЧИКИ СОБЫТИЙ ---
 
@@ -581,11 +524,9 @@
         if (isAuthenticated) {
             const toggleReadBtn = document.getElementById('toggle-read-btn');
             const togglePinBtn = document.getElementById('toggle-pin-btn');
-            const deletePoemBtn = document.getElementById('delete-poem-btn');
 
             if (toggleReadBtn) toggleReadBtn.addEventListener('click', handleToggleRead);
             if (togglePinBtn) togglePinBtn.addEventListener('click', handleTogglePin);
-            if (isAdmin && deletePoemBtn) deletePoemBtn.addEventListener('click', handleDeletePoem);
         }
 
         searchInput.addEventListener('input', filterAndRender);

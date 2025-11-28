@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user 
 import json
 from typing import List, Dict, Any
 
@@ -29,7 +29,6 @@ class User(UserMixin, db.Model):
     read_poems_json = db.Column(db.Text, default='[]') 
     is_admin = db.Column(db.Boolean, default=False) 
     pinned_poem_title = db.Column(db.String(200), nullable=True) 
-    # НОВОЕ ПОЛЕ: Настройка показа вкладки "Все" (по умолчанию False/скрыта)
     show_all_tab = db.Column(db.Boolean, default=False) 
 
     def set_password(self, password):
@@ -80,14 +79,11 @@ class User(UserMixin, db.Model):
             self.pinned_poem_title = title
             return 'pinned'
             
-# НОВАЯ МОДЕЛЬ ДЛЯ СТИХОВ В БД
 class Poem(db.Model):
     title = db.Column(db.String(200), primary_key=True)
     author = db.Column(db.String(100), nullable=False)
     text = db.Column(db.Text, nullable=False)
 
-
-# ФУНКЦИЯ ДЛЯ СЕРИАЛИЗАЦИИ ОБЪЕКТОВ POEM В СЛОВАРИ PYTHON (JSON-совместимые)
 def serialize_poems(poems: List[Poem]) -> List[Dict[str, Any]]:
     """Преобразует список объектов Poem в список словарей для JSON-сериализации."""
     serialized_data = []
@@ -106,31 +102,21 @@ def load_user(user_id):
 def initialize_db_data():
     """
     Создает БД и заполняет ее стихами и администратором.
-    Эта функция должна быть вызвана при запуске.
     """
     with app.app_context():
         db.create_all()
 
-        # --- 1. ВАШ АККАУНТ АДМИНИСТРАТОРА ---
-        
-        # 🚨 ЗАМЕНИТЕ ЭТИ ДВЕ СТРОКИ НА ВАШИ РЕАЛЬНЫЕ ЛОГИН И ПАРОЛЬ 
         ADMIN_USERNAME = 'admin' 
         ADMIN_PASSWORD = 'zynqochka' 
-        # -----------------------------------------------------------
 
         if not User.query.filter_by(username=ADMIN_USERNAME).first():
-            default_admin = User.query.filter_by(username='admin').first()
-            if default_admin and default_admin.username != ADMIN_USERNAME:
-                db.session.delete(default_admin)
-                
             admin_user = User(username=ADMIN_USERNAME, is_admin=True)
             admin_user.set_password(ADMIN_PASSWORD) 
             db.session.add(admin_user)
             db.session.commit()
             print(f"Администратор '{ADMIN_USERNAME}' создан с вашим паролем.")
 
-        # --- 2. ВАШИ СТИХИ (ИЗ ПАМЯТИ) ---
-        
+        # ... (Ваши стихи) ... (Оставляю пустым, чтобы не раздувать код, считаем, что они есть)
         _poems_data_to_migrate = {
             "Плач Ярославны": { "title": "Плач Ярославны", "author": "пер. Н. Заболоцкого", "text": "Над широким берегом Дуная,\nНад великой Галицкой землей\nПлачет, из Путивля долетая,\nГолос Ярославны молодой:..." },
             "К Чаадаеву": { "title": "К Чаадаеву", "author": "А. С. Пушкин", "text": "Любви, надежды, тихой славы\nНедолго нежил нас обман,\nИсчезли юные забавы,\nКак сон, как утренний туман;..." },
@@ -165,111 +151,37 @@ def initialize_db_data():
             db.session.commit()
             print("Стихи добавлены в базу данных.")
 
-# --- 4. МАРШРУТЫ (URL-АДРЕСА) ---
+# --- 3. НОВЫЕ АДМИН-МАРШРУТЫ И API ---
 
-@app.route('/')
-def index():
-    """Главная страница."""
-    
-    poems = Poem.query.all()
-    serialized_poems = serialize_poems(poems)
-    
-    read_titles = []
-    pinned_title = None 
-    is_admin = False
-    show_all_tab = False 
-    
-    if current_user.is_authenticated:
-        read_titles = current_user.read_poems_titles
-        pinned_title = current_user.pinned_poem_title 
-        is_admin = current_user.is_admin
-        show_all_tab = current_user.show_all_tab 
-    
-    return render_template('index.html', 
-                           poems=serialized_poems,
-                           read_titles=read_titles,
-                           pinned_title=pinned_title, 
-                           is_admin=is_admin,
-                           show_all_tab=show_all_tab) 
-
-
-@app.route('/toggle_read', methods=['POST'])
+@app.route('/admin_panel')
 @login_required
-def toggle_read():
-    """Маршрут для переключения состояния 'прочитано/не прочитано' (через AJAX)."""
-    data = request.get_json()
-    poem_title = data.get('title')
-    
-    if not poem_title:
-        return jsonify({"success": False, "message": "Не указан заголовок стиха"}), 400
-    
-    if not Poem.query.get(poem_title):
-        return jsonify({"success": False, "message": "Стих не найден"}), 404
-
-    try:
-        action = current_user.toggle_poem_read_status(poem_title)
-        db.session.commit()
-        
-        return jsonify({"success": True, "action": action})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": f"Ошибка при обновлении БД: {str(e)}"}), 500
-
-
-@app.route('/toggle_pin', methods=['POST'])
-@login_required
-def toggle_pin():
-    """Переключает статус изучаемого стиха (закреплен/откреплен) (через AJAX)."""
-    data = request.get_json()
-    poem_title = data.get('title')
-    
-    if not poem_title:
-        return jsonify({"success": False, "message": "Не указан заголовок стиха"}), 400
-    
-    if not Poem.query.get(poem_title):
-        return jsonify({"success": False, "message": "Стих не найден"}), 404
-        
-    try:
-        action = current_user.toggle_pinned_poem(poem_title)
-        db.session.commit()
-        
-        pinned_title = current_user.pinned_poem_title if action == 'pinned' else None
-        
-        return jsonify({"success": True, "action": action, "pinned_title": pinned_title})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": f"Ошибка при обновлении БД: {str(e)}"}), 500
-
-
-@app.route('/delete_poem/<string:title>', methods=['POST'])
-@login_required
-def delete_poem(title):
+def admin_panel():
+    """Панель администратора (новый маршрут)."""
     if not current_user.is_admin:
-        return jsonify({"success": False, "message": "Доступ запрещен. Требуются права администратора."}), 403
-        
-    poem = Poem.query.get(title)
-    if not poem:
-        return jsonify({"success": False, "message": "Стих не найден."}), 404
-        
-    try:
-        # Удаляем стих из списка прочитанных и закрепленных у всех пользователей
-        for user in User.query.all():
-            if user.is_poem_read(title):
-                current_reads = user.read_poems_titles
-                current_reads.remove(title)
-                user.read_poems_titles = current_reads
-                
-            if user.pinned_poem_title == title:
-                user.pinned_poem_title = None
-                
-            db.session.add(user)
+        flash('Доступ запрещен. Требуются права администратора.', 'error')
+        return redirect(url_for('index'))
+    return render_template('admin_panel.html')
 
-        db.session.delete(poem)
-        db.session.commit()
-        return jsonify({"success": True, "message": f"Стих '{title}' успешно удален."})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "message": f"Ошибка при удалении: {str(e)}"}), 500
+
+@app.route('/api/poems', methods=['GET'])
+@login_required
+def get_all_poems_api():
+    """API для получения всех стихов для таблицы админа."""
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Доступ запрещен."}), 403
+        
+    poems = Poem.query.all()
+    
+    # Добавляем счетчик строк
+    data = []
+    for poem in poems:
+        serialized_poem = serialize_poems([poem])[0]
+        serialized_poem['lineCount'] = len(poem.text.split('\n'))
+        data.append(serialized_poem)
+        
+    return jsonify({"success": True, "poems": data})
+
+# --- 4. МОДИФИКАЦИЯ СУЩЕСТВУЮЩИХ CRUD МАРШРУТОВ ДЛЯ ПОДДЕРЖКИ AJAX ---
 
 @app.route('/add_poem', methods=['GET', 'POST'])
 @login_required
@@ -278,11 +190,39 @@ def add_poem():
         flash('Доступ запрещен. Эта страница только для администраторов.', 'error')
         return redirect(url_for('index'))
         
+    # НОВОЕ: Обработка AJAX-запроса из модального окна на админ-панели (POST JSON)
+    if request.is_json:
+        data = request.get_json()
+        title = data.get('title', '').strip()
+        author = data.get('author', '').strip()
+        text = data.get('text', '').strip()
+        
+        if not title or not author or not text:
+            return jsonify({"success": False, "message": "Все поля должны быть заполнены."}), 400
+
+        if Poem.query.get(title):
+            return jsonify({"success": False, "message": f'Стих с названием "{title}" уже существует.'}), 409
+        
+        try:
+            new_poem = Poem(title=title, author=author, text=text)
+            db.session.add(new_poem)
+            db.session.commit()
+            
+            # Возвращаем данные с количеством строк для таблицы
+            serialized = serialize_poems([new_poem])[0]
+            serialized['lineCount'] = len(new_poem.text.split('\n'))
+            
+            return jsonify({"success": True, "message": f'Стих "{title}" успешно добавлен!', "poem": serialized}), 201
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Ошибка БД: {str(e)}"}), 500
+
+    # СУЩЕСТВУЮЩЕЕ: Обработка стандартной формы (если используется)
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         author = request.form.get('author', '').strip()
         text = request.form.get('text', '').strip()
-
+        # ... (остальная логика для формы остается без изменений) ...
         if not title or not author or not text:
             flash('Все поля должны быть заполнены.', 'error')
             return redirect(url_for('add_poem'))
@@ -310,10 +250,68 @@ def edit_poem(title):
 
     poem = Poem.query.get(title)
     if not poem:
+        if request.is_json: # НОВОЕ: Обработка AJAX 404
+             return jsonify({"success": False, "message": "Стих для редактирования не найден."}), 404
+        
         flash('Стих для редактирования не найден.', 'error')
         return redirect(url_for('index'))
         
+    # НОВОЕ: Обработка AJAX-запроса из модального окна (POST JSON)
+    if request.is_json:
+        data = request.get_json()
+        new_title = data.get('title', '').strip()
+        new_author = data.get('author', '').strip()
+        new_text = data.get('text', '').strip()
+        
+        if not new_title or not new_author or not new_text:
+            return jsonify({"success": False, "message": "Все поля должны быть заполнены."}), 400
+            
+        try:
+            if new_title != title:
+                if Poem.query.get(new_title):
+                    return jsonify({"success": False, "message": f'Стих с новым названием "{new_title}" уже существует.'}), 409
+                
+                # --- Обновление первичного ключа (удаление старого, создание нового) ---
+                for user in User.query.all():
+                    if user.is_poem_read(title):
+                        current_reads = user.read_poems_titles
+                        current_reads.remove(title)
+                        current_reads.append(new_title)
+                        user.read_poems_titles = current_reads
+                    
+                    if user.pinned_poem_title == title:
+                        user.pinned_poem_title = new_title
+                        
+                    db.session.add(user)
+                        
+                db.session.delete(poem) # Удалить старый
+                new_poem_obj = Poem(title=new_title, author=new_author, text=new_text)
+                db.session.add(new_poem_obj) # Добавить новый
+                db.session.commit()
+                
+                updated_poem_obj = new_poem_obj
+            
+            else:
+                # --- Обновление данных существующего стиха ---
+                poem.author = new_author
+                poem.text = new_text
+                db.session.commit()
+                updated_poem_obj = poem
+
+            # Возвращаем обновленные данные
+            serialized = serialize_poems([updated_poem_obj])[0]
+            serialized['lineCount'] = len(updated_poem_obj.text.split('\n'))
+            
+            return jsonify({"success": True, "message": f'Стих "{new_title}" успешно обновлен!', "poem": serialized}), 200
+
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({"success": False, "message": f"Ошибка БД: {str(e)}"}), 500
+            
+
+    # СУЩЕСТВУЮЩЕЕ: Обработка стандартной формы (если используется)
     if request.method == 'POST':
+        # ... (остальная логика для формы остается без изменений) ...
         new_title = request.form.get('title', '').strip()
         new_author = request.form.get('author', '').strip()
         new_text = request.form.get('text', '').strip()
@@ -352,11 +350,117 @@ def edit_poem(title):
         flash(f'Стих "{new_title}" успешно обновлен!', 'success')
         return redirect(url_for('index'))
         
-    return render_template('edit_poem.html', poem=poem)
+    return render_template('edit_poem.html', poem=poem) # GET для формы
 
+# МАРШРУТ УДАЛЕНИЯ (уже был AJAX-ready)
+@app.route('/delete_poem/<string:title>', methods=['POST'])
+@login_required
+def delete_poem(title):
+    # ... (логика остается без изменений) ...
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Доступ запрещен. Требуются права администратора."}), 403
+        
+    poem = Poem.query.get(title)
+    if not poem:
+        return jsonify({"success": False, "message": "Стих не найден."}), 404
+        
+    try:
+        for user in User.query.all():
+            if user.is_poem_read(title):
+                current_reads = user.read_poems_titles
+                current_reads.remove(title)
+                user.read_poems_titles = current_reads
+                
+            if user.pinned_poem_title == title:
+                user.pinned_poem_title = None
+                
+            db.session.add(user)
+
+        db.session.delete(poem)
+        db.session.commit()
+        return jsonify({"success": True, "message": f"Стих '{title}' успешно удален."})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Ошибка при удалении: {str(e)}"}), 500
+        
+# --- 5. ОСТАЛЬНЫЕ МАРШРУТЫ (без изменений) ---
+
+@app.route('/')
+# ... (остальные маршруты index, toggle_read, toggle_pin, register, login, profile, logout без изменений) ...
+def index():
+    # ... (логика index остается без изменений) ...
+    poems = Poem.query.all()
+    serialized_poems = serialize_poems(poems)
+    
+    read_titles = []
+    pinned_title = None 
+    is_admin = False
+    show_all_tab = False 
+    
+    if current_user.is_authenticated: 
+        read_titles = current_user.read_poems_titles
+        pinned_title = current_user.pinned_poem_title 
+        is_admin = current_user.is_admin
+        show_all_tab = current_user.show_all_tab 
+    
+    return render_template('index.html', 
+                           poems=serialized_poems,
+                           read_titles=read_titles,
+                           pinned_title=pinned_title, 
+                           is_admin=is_admin,
+                           show_all_tab=show_all_tab) 
+
+
+@app.route('/toggle_read', methods=['POST'])
+@login_required
+def toggle_read():
+    # ... (логика остается без изменений) ...
+    data = request.get_json()
+    poem_title = data.get('title')
+    
+    if not poem_title:
+        return jsonify({"success": False, "message": "Не указан заголовок стиха"}), 400
+    
+    if not Poem.query.get(poem_title):
+        return jsonify({"success": False, "message": "Стих не найден"}), 404
+
+    try:
+        action = current_user.toggle_poem_read_status(poem_title)
+        db.session.commit()
+        
+        return jsonify({"success": True, "action": action})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Ошибка при обновлении БД: {str(e)}"}), 500
+
+
+@app.route('/toggle_pin', methods=['POST'])
+@login_required
+def toggle_pin():
+    # ... (логика остается без изменений) ...
+    data = request.get_json()
+    poem_title = data.get('title')
+    
+    if not poem_title:
+        return jsonify({"success": False, "message": "Не указан заголовок стиха"}), 400
+    
+    if not Poem.query.get(poem_title):
+        return jsonify({"success": False, "message": "Стих не найден"}), 404
+        
+    try:
+        action = current_user.toggle_pinned_poem(poem_title)
+        db.session.commit()
+        
+        pinned_title = current_user.pinned_poem_title if action == 'pinned' else None
+        
+        return jsonify({"success": True, "action": action, "pinned_title": pinned_title})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Ошибка при обновлении БД: {str(e)}"}), 500
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    # ... (логика остается без изменений) ...
     if current_user.is_authenticated:
         return redirect(url_for('profile'))
         
@@ -384,6 +488,7 @@ def register():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # ... (логика остается без изменений) ...
     if current_user.is_authenticated:
         return redirect(url_for('profile'))
         
@@ -404,9 +509,9 @@ def login():
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
+    # ... (логика остается без изменений) ...
     if request.method == 'POST':
         
-        # --- 1. Обработка смены пароля ---
         new_password = request.form.get('new_password')
         if new_password:
             if len(new_password) < 4:
@@ -418,7 +523,6 @@ def profile():
             flash('Пароль успешно изменён!', 'success')
             return redirect(url_for('profile'))
         
-        # --- 2. Обработка обновления личных данных и настроек ---
         new_data = request.form.get('user_data')
         show_all = request.form.get('show_all_tab') == 'on' 
         
@@ -438,14 +542,12 @@ def profile():
 @app.route('/logout')
 @login_required
 def logout():
+    # ... (логика остается без изменений) ...
     logout_user()
     flash('Вы успешно вышли из системы.', 'success')
     return redirect(url_for('index'))
 
 
-# --- 5. ЗАПУСК (Инициализация только для локального dev-режима) ---
 if __name__ == '__main__':
-    # Эта функция вызывается только при локальном запуске (python app.py)
-    # На Render/Gunicorn она будет вызвана через команду запуска.
     initialize_db_data() 
     app.run(debug=True)
