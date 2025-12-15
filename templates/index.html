@@ -278,8 +278,9 @@
             const readText = isRead ? 'Прочитано' : 'Не прочитано';
             const pinnedIcon = isPinned ? `<span class="text-sky-500 mr-1">★</span>` : '';
 
+            // **ВОССТАНОВЛЕННЫЙ ДИЗАЙН КАРТОЧКИ**
             return `
-                <div class="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 border border-gray-100 p-6 flex flex-col justify-between">
+                <div class="bg-white rounded-xl shadow-md p-5 flex flex-col justify-between">
                     <div>
                         <h3 class="text-xl font-semibold text-gray-900 mb-1 leading-snug flex items-start">
                             ${pinnedIcon}
