@@ -2,4 +2,5 @@ Flask
 Flask-SQLAlchemy
 Flask-Login
 Werkzeug
-gunicorn # Обязательно для запуска веб-сервера на Render
+gunicorn
+psycopg2-binary
