@@ -20,8 +20,11 @@
             background-color: #f9fafb;
         }
 
-        /* НОВЫЙ СТИЛЬ для форматированного текста стиха */
+        /* ---------------------------------------------------- */
+        /* НОВЫЙ СТИЛЬ ВМЕСТО pre.poem для поддержки Markdown */
+        /* ---------------------------------------------------- */
         .poem-content {
+            /* Имитация стиля pre.poem для сохранения форматирования */
             white-space: pre-wrap;
             line-height: 1.6;
             font-family: inherit;
@@ -38,6 +41,8 @@
         .poem-content strong {
             font-weight: 600;
         }
+
+        /* ---------------------------------------------------- */
 
         /* Стили для Модального окна */
         .modal {
@@ -195,11 +200,11 @@
         const isAdmin = {{ is_admin | tojson }};
         const showAllTabSetting = {{ show_all_tab | tojson }};
 
-        let allPoems = []; // Будет заполнено в window.onload
+        let allPoems = [];
         let readTitles = new Set(readTitlesInitial);
         let pinnedTitle = pinnedTitleInitial;
-        let currentFilter = 'pinned'; // Фильтр по умолчанию
-        let currentSort = { type: 'lines', order: 'desc' }; // Сортировка по умолчанию
+        let currentFilter = 'pinned';
+        let currentSort = { type: 'lines', order: 'desc' };
 
         // Кэширование DOM-элементов
         const modal = document.getElementById('poem-modal');
@@ -208,23 +213,17 @@
         const sortContainer = document.getElementById('sort-container');
         const pinButton = document.getElementById('pin-poem-btn');
         const readButton = document.getElementById('mark-read-btn');
-        const pinText = document.getElementById('pin-text');
-        const readText = document.getElementById('read-text');
         const editLink = document.getElementById('edit-poem-link');
 
-        // Иконки SVG
+        // Иконки SVG (Для кнопок "Прочитано" и "Закрепить")
         const iconPin = '<svg class="w-4 h-4 fill-current text-sky-600" viewBox="0 0 24 24"><path d="M16 12V4.5l-2.5 2.5V12h-3V7l-2.5-2.5V12H5v2h2v4.75l-1.5 1.5H18l-1.5-1.5V14h2v-2h-3zm-2 0V7l2.5-2.5V12h-2.5z"/></svg>';
         const iconUnpin = '<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M16 12V4.5l-2.5 2.5V12h-3V7l-2.5-2.5V12H5v2h2v4.75l-1.5 1.5H18l-1.5-1.5V14h2v-2h-3zm-2 0V7l2.5-2.5V12h-2.5z"/></svg>';
-        const iconRead = '<svg class="w-4 h-4 fill-current text-sky-600" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
-        const iconUnread = '<svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>';
+        const iconRead = '<svg class="w-4 h-4 fill-current text-green-600" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+        const iconUnread = '<svg class="w-4 h-4 fill-current text-gray-500" viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>';
 
 
         // --- ОСНОВНАЯ ЛОГИКА ФИЛЬТРАЦИИ И ОТОБРАЖЕНИЯ ---
 
-        /**
-         * Определяет, соответствует ли стих текущему фильтру.
-         * @param {Object} poem 
-         */
         function poemMatchesFilter(poem) {
             const isRead = readTitles.has(poem.title);
             const isPinned = poem.title === pinnedTitle;
@@ -243,10 +242,6 @@
             }
         }
 
-        /**
-         * Сортирует массив стихов.
-         * @param {Array<Object>} poems
-         */
         function sortPoems(poems) {
             const { type, order } = currentSort;
             const direction = order === 'asc' ? 1 : -1;
@@ -274,9 +269,7 @@
         }
 
         /**
-         * Отрисовывает карточку стиха.
-         * @param {Object} poem 
-         * @returns {string} HTML-строка карточки
+         * Отрисовывает карточку стиха (ВОССТАНОВЛЕННЫЙ ОРИГИНАЛЬНЫЙ ДИЗАЙН).
          */
         function renderPoemCard(poem) {
             const isRead = readTitles.has(poem.title);
@@ -308,9 +301,6 @@
             `;
         }
 
-        /**
-         * Обновляет счетчики вкладок.
-         */
         function updateTabCounts() {
             const readCount = allPoems.filter(p => readTitles.has(p.title)).length;
             const pinnedCount = allPoems.filter(p => p.title === pinnedTitle).length;
@@ -320,67 +310,54 @@
             document.getElementById('tab-count-unread').textContent = unreadCount;
             document.getElementById('tab-count-read').textContent = readCount;
 
-            // Если выбран фильтр "Изучаю" и ничего не закреплено, переключаем на "Непрочитано"
+            // Логика автоматического переключения фильтра
             if (currentFilter === 'pinned' && pinnedCount === 0) {
                 if (unreadCount > 0) {
-                    switchFilter('unread', true); // Принудительно переключаем, но без повторного рендера
+                    switchFilter('unread', true);
                 } else if (readCount > 0) {
                     switchFilter('read', true);
-                } else {
+                } else if (showAllTabSetting) {
                     switchFilter('unfiltered', true);
                 }
             }
         }
 
 
-        /**
-         * Главная функция для фильтрации, сортировки и отрисовки.
-         */
         function filterAndRender() {
-            // 1. Фильтрация
             let filteredPoems;
             if (isAuthenticated) {
                 filteredPoems = allPoems.filter(poemMatchesFilter);
             } else {
-                // Для неаутентифицированных пользователей показываем все
                 filteredPoems = allPoems;
             }
 
-            // 2. Сортировка
             const sortedPoems = sortPoems(filteredPoems);
 
-            // 3. Рендеринг
             listContainer.innerHTML = '';
             if (sortedPoems.length === 0) {
                 listContainer.innerHTML = `<p class="text-center text-gray-500 col-span-full py-12">Нет стихов, соответствующих выбранному фильтру/настройкам.</p>`;
             } else {
                 sortedPoems.forEach((poem, index) => {
-                    // Присваиваем ID в объекте для простоты доступа из модального окна
                     poem.id = index;
                     listContainer.innerHTML += renderPoemCard(poem);
                 });
             }
 
-            // 4. Обновление счетчиков (может влиять на активный фильтр)
             updateTabCounts();
         }
 
-        /**
-         * Переключает активный фильтр.
-         * @param {string} filterType 
-         * @param {boolean} skipRender Флаг для пропуска повторного рендера
-         */
         function switchFilter(filterType, skipRender = false) {
             currentFilter = filterType;
 
             // Обновление UI вкладок
             document.querySelectorAll('.tab-btn').forEach(btn => {
-                if (btn.dataset.filter === filterType) {
+                if (btn.dataset.filter === 'unfiltered' && !showAllTabSetting && btn.classList.contains('hidden')) {
+                } else if (btn.dataset.filter === filterType) {
                     btn.classList.add('bg-sky-100', 'text-sky-600');
-                    btn.classList.remove('bg-gray-100', 'text-gray-600', 'hover:bg-sky-50', 'hover:text-sky-600');
+                    btn.classList.remove('text-gray-600', 'hover:text-sky-600');
                 } else {
                     btn.classList.remove('bg-sky-100', 'text-sky-600');
-                    btn.classList.add('bg-gray-100', 'text-gray-600', 'hover:bg-sky-50', 'hover:text-sky-600');
+                    btn.classList.add('text-gray-600', 'hover:text-sky-600');
                 }
             });
 
@@ -391,10 +368,6 @@
 
         // --- ЛОГИКА МОДАЛЬНОГО ОКНА ---
 
-        /**
-         * Показывает модальное окно с деталями стиха.
-         * @param {number} poemId
-         */
         function showModal(poemId) {
             if (!isAuthenticated) {
                 alert('Для просмотра стихов, пожалуйста, войдите или зарегистрируйтесь.');
@@ -422,7 +395,9 @@
 
             // Кнопка "Прочитано"
             readButton.dataset.title = poem.title;
-            readButton.innerHTML = isRead ? iconRead + `<span id="read-text">Пометить непрочитанным</span>` : iconUnread + `<span id="read-text">Пометить прочитанным</span>`;
+            const currentReadIcon = isRead ? iconRead : iconUnread;
+            readButton.innerHTML = currentReadIcon + `<span id="read-text">${isRead ? 'Пометить непрочитанным' : 'Пометить прочитанным'}</span>`;
+
 
             // Кнопка "Редактировать"
             if (isAdmin && editLink) {
@@ -449,14 +424,16 @@
 
                 if (response.ok) {
                     const result = await response.json();
-                    if (result.action === 'marked') {
+                    const isMarked = result.action === 'marked';
+
+                    if (isMarked) {
                         readTitles.add(title);
                         readButton.innerHTML = iconRead + `<span id="read-text">Пометить непрочитанным</span>`;
                     } else {
                         readTitles.delete(title);
                         readButton.innerHTML = iconUnread + `<span id="read-text">Пометить прочитанным</span>`;
                     }
-                    filterAndRender(); // Перерендеринг списка
+                    filterAndRender();
                 } else {
                     alert('Ошибка при обновлении статуса.');
                 }
@@ -477,8 +454,6 @@
 
                 if (response.ok) {
                     const result = await response.json();
-
-                    // Обновляем глобальное состояние закрепления
                     pinnedTitle = result.pinned_title;
 
                     if (result.action === 'pinned') {
@@ -487,7 +462,6 @@
                         pinButton.innerHTML = iconUnpin + `<span id="pin-text">Закрепить</span>`;
                     }
 
-                    // Если пользователь на вкладке "Изучаю", фильтр может измениться
                     filterAndRender();
                 } else {
                     alert('Ошибка при закреплении стиха.');
@@ -518,7 +492,6 @@
             const targetButton = event.target.closest('.tab-btn');
             if (!targetButton) return;
 
-            // Если неаутентифицирован, позволяем только 'unfiltered' (Все), если он виден
             if (!isAuthenticated && targetButton.dataset.filter !== 'unfiltered') {
                 alert('Для использования фильтров, пожалуйста, войдите.');
                 window.location.href = '{{ url_for("login") }}';
@@ -541,8 +514,8 @@
             if (currentSort.type === sortType) {
                 sortOrder = (currentSort.order === 'asc' || currentSort.order === 'none') ? 'desc' : 'asc';
             } else {
-                // 2. Если новый столбец, устанавливаем asc по умолчанию
-                sortOrder = sortType === 'lines' ? 'desc' : 'asc'; // Длину удобнее смотреть с большего
+                // 2. Если новый столбец, устанавливаем asc по умолчанию (или desc для линий)
+                sortOrder = sortType === 'lines' ? 'desc' : 'asc';
             }
 
             // 3. Обновляем текущее состояние сортировки
@@ -550,17 +523,18 @@
 
             // 4. Обновляем UI для всех заголовков
             document.querySelectorAll('.sort-btn').forEach(h => {
-                // Сброс всех стилей и символов
+                h.dataset.order = 'none'; // Сброс для всех
                 h.classList.remove('bg-sky-100', 'text-sky-600', 'font-bold');
-                h.classList.add('bg-gray-100', 'text-gray-600');
+                h.classList.add('text-gray-600');
 
                 const span = h.querySelector('.order-symbol');
                 if (span) span.remove();
             });
 
             // 5. Устанавливаем новый порядок и метку для текущей кнопки
+            targetButton.dataset.order = sortOrder;
             targetButton.classList.add('bg-sky-100', 'text-sky-600', 'font-bold');
-            targetButton.classList.remove('bg-gray-100', 'text-gray-600');
+            targetButton.classList.remove('text-gray-600');
 
             const orderSymbol = sortOrder === 'asc' ? '▲' : '▼';
             const orderSpan = document.createElement('span');
@@ -587,20 +561,18 @@
 
         // Инициализация при загрузке страницы
         window.onload = () => {
-            // Добавляем ID (индекс) и счетчик строк в данные стихов
             allPoems = allData.map((poem, index) => ({
                 ...poem,
                 id: index,
-                // Считаем строки по символу новой строки, который был в исходном тексте БД
-                lineCount: poem.text.split('<br>').length // Markdown парсер может заменить \n на <br> или <p>
+                // Считаем строки по тегу <br>, так как Markdown парсер возвращает HTML
+                lineCount: (poem.text.match(/<br>/g) || []).length + 1
             }));
 
-            // Устанавливаем активный фильтр по умолчанию (pinned, или unread/read, если pinned пуст)
             const pinnedCount = allPoems.filter(p => p.title === pinnedTitle).length;
             const unreadCount = allPoems.length - allPoems.filter(p => readTitles.has(p.title)).length;
             const readCount = allPoems.filter(p => readTitles.has(p.title)).length;
 
-            let defaultFilter = 'unfiltered'; // Безопасное значение по умолчанию
+            let defaultFilter = 'unfiltered';
             if (isAuthenticated) {
                 defaultFilter = 'pinned';
                 if (pinnedCount === 0) {
@@ -616,11 +588,23 @@
             }
 
             // Запускаем счетчики, фильтрацию и отрисовку
-            switchFilter(defaultFilter, true); // Переключаем фильтр без рендера
-            filterAndRender(); // Запускаем рендер
+            switchFilter(defaultFilter, true);
+            filterAndRender();
 
-            // Устанавливаем активную сортировку
-            document.querySelector(`.sort-btn[data-sort="${currentSort.type}"]`).click();
+            // Устанавливаем активную сортировку (активируем кнопку, чтобы показать стрелку)
+            const initialSortButton = document.querySelector(`.sort-btn[data-sort="${currentSort.type}"]`);
+            if (initialSortButton) {
+                // Если мы сортируем по умолчанию, нужно убедиться, что кнопка выглядит активной
+                initialSortButton.dataset.order = currentSort.order;
+                initialSortButton.classList.add('bg-sky-100', 'text-sky-600', 'font-bold');
+                initialSortButton.classList.remove('text-gray-600');
+
+                const orderSymbol = currentSort.order === 'asc' ? '▲' : '▼';
+                const orderSpan = document.createElement('span');
+                orderSpan.className = 'order-symbol ml-1';
+                orderSpan.textContent = orderSymbol;
+                initialSortButton.appendChild(orderSpan);
+            }
 
         };
     </script>
