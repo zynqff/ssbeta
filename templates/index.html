@@ -61,6 +61,15 @@
             transform: translateY(-2px);
             @apply shadow-lg;
         }
+
+        /* Дополнительный класс для плавного скрытия иконок */
+        .sort-arrow-icon {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            opacity: 0;
+            /* Изначально скрываем все иконки в CSS */
+        }
+
+        /* В JS мы будем управлять opacity: 1 для активной иконки */
     </style>
 </head>
 
@@ -130,15 +139,34 @@
 
             <div id="sort-buttons-container"
                 class="flex flex-wrap gap-2 justify-center mt-4 pt-4 border-t border-gray-100">
-                <span class="font-medium text-gray-700 mr-2 self-center">Сортировать:</span>
+                <span class="font-medium text-gray-700 mr-2 self-center">Сортировать по:</span>
+
                 <button data-sort="title" data-order="asc"
-                    class="sort-btn active px-4 py-2 rounded-lg text-sm font-semibold">По названию (А-Я)</button>
-                <button data-sort="title" data-order="desc"
-                    class="sort-btn px-4 py-2 rounded-lg text-sm font-semibold">По названию (Я-А)</button>
+                    class="sort-btn active px-4 py-2 rounded-lg font-semibold transition-colors duration-150 text-base">Названию
+                    <svg data-sort-icon="title"
+                        class="sort-arrow-icon w-4 h-4 inline ml-1 align-text-top transform transition-transform"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                </button>
+
+                <button data-sort="author" data-order="asc"
+                    class="sort-btn px-4 py-2 rounded-lg font-semibold transition-colors duration-150 text-base">Автору
+                    <svg data-sort-icon="author"
+                        class="sort-arrow-icon w-4 h-4 inline ml-1 align-text-top transform transition-transform"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                </button>
+
                 <button data-sort="length" data-order="asc"
-                    class="sort-btn px-4 py-2 rounded-lg text-sm font-semibold">По длине (короче)</button>
-                <button data-sort="length" data-order="desc"
-                    class="sort-btn px-4 py-2 rounded-lg text-sm font-semibold">По длине (длиннее)</button>
+                    class="sort-btn px-4 py-2 rounded-lg font-semibold transition-colors duration-150 text-base">Длине
+                    <svg data-sort-icon="length"
+                        class="sort-arrow-icon w-4 h-4 inline ml-1 align-text-top transform transition-transform"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                </button>
             </div>
         </div>
 
@@ -215,6 +243,7 @@
         let currentPoem = null; // Для модального окна
         // ИЗМЕНЕНИЕ: По умолчанию 'unread' для авторизованных, 'unfiltered' для гостей
         let currentFilter = isAuthenticated ? 'unread' : 'unfiltered';
+        // Изменено на сортировку по "Названию" (ASC) по умолчанию
         let currentSort = { type: 'title', order: 'asc' };
 
         const poemsContainer = document.getElementById('poems-container');
@@ -309,6 +338,9 @@
                 if (currentSort.type === 'length') {
                     valA = a.lineCount;
                     valB = b.lineCount;
+                } else if (currentSort.type === 'author') {
+                    valA = a.author.toLowerCase();
+                    valB = b.author.toLowerCase();
                 } else { // title
                     valA = a.title.toLowerCase();
                     valB = b.title.toLowerCase();
@@ -353,6 +385,7 @@
         };
 
         // --- 2. ЛОГИКА МОДАЛЬНОГО ОКНА ---
+        // (Логика модального окна остается без изменений, за исключением имен переменных, которые мы изменили для единообразия)
 
         const openModal = (title) => {
             currentPoem = allPoems.find(p => p.title === title);
@@ -378,7 +411,6 @@
                 if (readButtonWrapper) readButtonWrapper.classList.remove('hidden');
                 if (pinButtonWrapper) pinButtonWrapper.classList.remove('hidden');
 
-                // Админ-кнопки в модальном окне больше не показываются
             } else {
                 if (readButtonWrapper) readButtonWrapper.classList.add('hidden');
                 if (pinButtonWrapper) pinButtonWrapper.classList.add('hidden');
@@ -531,19 +563,48 @@
 
         searchInput.addEventListener('input', filterAndRender);
 
+        // ОБНОВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПОК СОРТИРОВКИ С ДИНАМИЧЕСКИМИ ИКОНКАМИ
         sortButtonsContainer.addEventListener('click', (e) => {
             const targetButton = e.target.closest('button.sort-btn');
             if (!targetButton) return;
 
-            currentSort.type = targetButton.dataset.sort;
-            currentSort.order = targetButton.dataset.order;
+            const newSortType = targetButton.dataset.sort;
+            let newSortOrder = targetButton.dataset.order;
 
+            // 1. Определяем новое направление сортировки (toggle если нажата та же кнопка)
+            if (newSortType === currentSort.type) {
+                newSortOrder = currentSort.order === 'asc' ? 'desc' : 'asc';
+            } else {
+                newSortOrder = 'asc'; // Сбрасываем на ASC при смене типа
+            }
+
+            currentSort.type = newSortType;
+            currentSort.order = newSortOrder;
+
+            // 2. Обновляем data-order на кнопке
+            targetButton.dataset.order = newSortOrder;
+
+            // 3. Обновляем класс active
             const activeSort = sortButtonsContainer.querySelector('.active');
             if (activeSort) activeSort.classList.remove('active');
             targetButton.classList.add('active');
 
+            // 4. Обновляем ВСЕ иконки
+            const allIcons = document.querySelectorAll('.sort-arrow-icon');
+            allIcons.forEach(icon => {
+                if (icon.dataset.sortIcon === currentSort.type) {
+                    // Показываем и поворачиваем активную иконку
+                    icon.style.opacity = 1;
+                    icon.style.transform = currentSort.order === 'desc' ? 'rotate(180deg)' : 'rotate(0deg)';
+                } else {
+                    // Скрываем неактивные иконки
+                    icon.style.opacity = 0;
+                }
+            });
+
             filterAndRender();
         });
+
 
         modal.addEventListener('click', (event) => {
             if (event.target === modal) {
@@ -576,6 +637,18 @@
                     }
                 }
             }
+
+            // Начальная настройка иконок: показываем только иконку для текущего типа сортировки
+            const allIcons = document.querySelectorAll('.sort-arrow-icon');
+            allIcons.forEach(icon => {
+                if (icon.dataset.sortIcon === currentSort.type) {
+                    icon.style.opacity = 1;
+                    icon.style.transform = currentSort.order === 'desc' ? 'rotate(180deg)' : 'rotate(0deg)';
+                } else {
+                    icon.style.opacity = 0;
+                }
+            });
+
 
             // Запускаем счетчики и отрисовку
             updateTabCounts();
