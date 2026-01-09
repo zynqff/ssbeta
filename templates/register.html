@@ -26,7 +26,13 @@
             Регистрация
         </h2>
 
-        <form method="POST">
+        {% if error %}
+        <div class="mb-4 p-3 text-sm rounded-lg shadow-sm bg-red-100 text-red-700">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="{{ request.url_for('register_post') }}">
             <div class="mb-4">
                 <label for="username" class="block text-sm font-medium text-gray-700 mb-1">Логин:</label>
                 <input type="text" id="username" name="username" required
@@ -46,7 +52,7 @@
         </form>
 
         <p class="mt-6 text-center text-sm text-gray-600">
-            Уже есть аккаунт? <a href="{{ url_for('login') }}"
+            Уже есть аккаунт? <a href="{{ request.url_for('login_get') }}"
                 class="font-medium text-sky-600 hover:text-sky-800 transition-colors">Войти</a>
         </p>
     </div>

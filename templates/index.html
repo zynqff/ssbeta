@@ -80,40 +80,28 @@
         <header class="flex flex-col sm:flex-row justify-between items-center py-4 mb-8 border-b border-gray-200">
             <h1 class="text-4xl font-extrabold text-gray-900 mb-4 sm:mb-0">Сборник Стихов</h1>
             <nav class="flex items-center space-x-4">
-                {% if current_user.is_authenticated %}
+                {% if current_user %}
                 {% if current_user.is_admin %}
                 <span class="text-red-600 font-bold">Администратор</span>
-                <a href="{{ url_for('admin_panel') }}" class="text-red-600 hover:text-red-700 font-semibold">Панель
-                    админа</a> {% endif %}
-                <a href="{{ url_for('profile') }}" class="text-gray-700 hover:text-sky-600 font-semibold">Профиль ({{
+                <a href="{{ request.url_for('admin_panel') }}" class="text-red-600 hover:text-red-700 font-semibold">Панель
+                    админа</a>
+                {% endif %}
+                <a href="{{ request.url_for('profile_get') }}" class="text-gray-700 hover:text-sky-600 font-semibold">Профиль ({{
                     current_user.username }})</a>
-                <a href="{{ url_for('logout') }}" class="text-gray-700 hover:text-sky-600 font-semibold">Выйти</a>
+                <a href="{{ request.url_for('logout') }}" class="text-gray-700 hover:text-sky-600 font-semibold">Выйти</a>
                 {% else %}
-                <a href="{{ url_for('login') }}" class="text-sky-500 hover:text-sky-600 font-semibold">Войти</a>
-                <a href="{{ url_for('register') }}"
+                <a href="{{ request.url_for('login_get') }}" class="text-sky-500 hover:text-sky-600 font-semibold">Войти</a>
+                <a href="{{ request.url_for('register_get') }}"
                     class="text-sky-500 hover:text-sky-600 font-semibold">Регистрация</a>
                 {% endif %}
             </nav>
         </header>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="mb-4 space-y-2">
-            {% for category, message in messages %}
-            <div
-                class="p-3 text-sm rounded-lg shadow-sm {{ 'bg-green-100 text-green-700' if category == 'success' else 'bg-red-100 text-red-700' }}">
-                {{ message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
-
         <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-200">
             <input type="search" id="search-input" placeholder="Поиск по названию, автору или тексту..."
                 class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-sky-500 focus:border-sky-500 transition duration-150 text-lg">
 
-            {% if current_user.is_authenticated %}
+            {% if current_user %}
             <div class="flex flex-nowrap overflow-x-auto gap-3 justify-center mt-4 p-2 -m-2">
 
                 <button data-filter="unfiltered" id="tab-unfiltered"
@@ -187,7 +175,7 @@
 
             <pre id="modal-text" class="poem mb-6 text-base text-gray-800"></pre>
 
-            {% if current_user.is_authenticated %}
+            {% if current_user %}
             <div
                 class="flex flex-wrap justify-between items-center pt-4 border-t border-gray-100 space-y-3 sm:space-y-0">
 
@@ -230,20 +218,17 @@
         // ВАЖНО: Jinja2 вставляет сюда данные из Python!
         const allData = {{ poems | tojson }};
 
-        // ИСПРАВЛЕННЫЕ СТРОКИ: Булевы значения передаются как строки и преобразуются в JS-булевы
-        const readPoemsTitles = new Set({{ (read_titles if current_user.is_authenticated else[]) | tojson }});
+        const readPoemsTitles = new Set({{ read_poems | tojson | safe }});
         let pinnedPoemTitle = {{ pinned_title | tojson }};
-        const isAuthenticated = "{{ 'true' if current_user.is_authenticated else 'false' }}" === 'true';
-        const isAdmin = "{{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }}" === 'true';
-        const showAllTabSetting = "{{ 'true' if current_user.is_authenticated and show_all_tab else 'false' }}" === 'true';
+        const isAuthenticated = {{ 'true' if current_user else 'false' }};
+        const isAdmin = {{ 'true' if current_user and current_user.is_admin else 'false' }};
+        const showAllTabSetting = {{ 'true' if current_user and current_user.show_all_tab else 'false' }};
 
         // --- 1. ЛОГИКА ФИЛЬТРАЦИИ И СОРТИРОВКИ ---
 
         let allPoems = [];
         let currentPoem = null; // Для модального окна
-        // ИЗМЕНЕНИЕ: По умолчанию 'unread' для авторизованных, 'unfiltered' для гостей
         let currentFilter = isAuthenticated ? 'unread' : 'unfiltered';
-        // Изменено на сортировку по "Названию" (ASC) по умолчанию
         let currentSort = { type: 'title', order: 'asc' };
 
         const poemsContainer = document.getElementById('poems-container');
@@ -267,7 +252,6 @@
 
             let borderClass = 'border-gray-200';
             if (isPinned) {
-                // Стиль для закрепленного стиха
                 borderClass = 'border-orange-500 ring-2 ring-orange-200';
             } else if (isRead) {
                 borderClass = 'border-sky-100';
@@ -277,7 +261,7 @@
             card.innerHTML = `
                 <h3 class="text-xl font-bold text-gray-900 mb-1 break-words">${poem.title}</h3>
                 <p class="text-sm text-gray-500 mb-3 italic">Автор: ${poem.author}</p>
-                <p class="text-sm text-gray-500">${poem.lineCount} строк</p>
+                <p class="text-sm text-gray-500">${poem.line_count} строк</p>
                 ${isAuthenticated ? `
                 <div class="flex flex-wrap gap-2 mt-2">
                     <span class="inline-block px-3 py-1 text-xs font-semibold rounded-full ${isRead ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-700'}">
@@ -296,7 +280,7 @@
         };
 
         const filterAndRender = () => {
-            const searchText = searchInput.value.toLowerCase();
+            const searchText = searchInput.value.toLowerCase().trim();
 
             let filteredPoems = allPoems.filter(poem => {
                 const matchesSearch = poem.title.toLowerCase().includes(searchText) ||
@@ -309,35 +293,28 @@
 
                 const isRead = readPoemsTitles.has(poem.title);
 
-                // Логика фильтрации по вкладкам
                 if (currentFilter === 'unread') return !isRead;
                 if (currentFilter === 'read') return isRead;
-                // 'unfiltered' (Все) возвращает true, если поиск прошел успешно
-
+                
                 return true;
             });
 
-            // --- 1. ПРИОРИТЕТ ЗАКРЕПЛЕННОГО СТИХА ---
             let pinnedPoem = null;
             let finalPoems = [];
 
             if (isAuthenticated && pinnedPoemTitle) {
-                // Ищем закрепленный стих только среди тех, которые прошли текущий фильтр 
                 pinnedPoem = filteredPoems.find(p => p.title === pinnedPoemTitle);
-
                 if (pinnedPoem) {
-                    // Удаляем закрепленный стих из основного списка, чтобы он не сортировался
                     filteredPoems = filteredPoems.filter(p => p.title !== pinnedPoemTitle);
                 }
             }
 
-            // --- 2. Сортировка оставшихся стихов ---
             filteredPoems.sort((a, b) => {
                 let valA, valB;
 
                 if (currentSort.type === 'length') {
-                    valA = a.lineCount;
-                    valB = b.lineCount;
+                    valA = a.line_count;
+                    valB = b.line_count;
                 } else if (currentSort.type === 'author') {
                     valA = a.author.toLowerCase();
                     valB = b.author.toLowerCase();
@@ -351,14 +328,11 @@
                 return 0;
             });
 
-            // --- 3. Объединение: закрепленный стих + отсортированный список ---
             if (pinnedPoem) {
-                finalPoems.push(pinnedPoem); // Закрепленный стих всегда первый
+                finalPoems.push(pinnedPoem);
             }
             finalPoems.push(...filteredPoems);
 
-
-            // Отрисовка
             poemsContainer.innerHTML = '';
             if (finalPoems.length === 0) {
                 noResultsMessage.classList.remove('hidden');
@@ -384,22 +358,13 @@
             document.getElementById('count-read').textContent = readCount;
         };
 
-        // --- 2. ЛОГИКА МОДАЛЬНОГО ОКНА ---
-        // (Логика модального окна остается без изменений, за исключением имен переменных, которые мы изменили для единообразия)
-
         const openModal = (title) => {
             currentPoem = allPoems.find(p => p.title === title);
             if (!currentPoem) return;
 
-            const modalTitle = document.getElementById('modal-title');
-            const modalAuthor = document.getElementById('modal-author');
-            const modalText = document.getElementById('modal-text');
-            const readButtonWrapper = document.getElementById('read-button-wrapper');
-            const pinButtonWrapper = document.getElementById('pin-button-wrapper');
-
-            modalTitle.textContent = currentPoem.title;
-            modalAuthor.textContent = `Автор: ${currentPoem.author}`;
-            modalText.textContent = currentPoem.text;
+            document.getElementById('modal-title').textContent = currentPoem.title;
+            document.getElementById('modal-author').textContent = `Автор: ${currentPoem.author}`;
+            document.getElementById('modal-text').textContent = currentPoem.text;
 
             if (isAuthenticated) {
                 const isRead = readPoemsTitles.has(title);
@@ -408,12 +373,12 @@
                 updateModalReadButton(isRead);
                 updateModalPinButton(isPinned);
 
-                if (readButtonWrapper) readButtonWrapper.classList.remove('hidden');
-                if (pinButtonWrapper) pinButtonWrapper.classList.remove('hidden');
+                document.getElementById('read-button-wrapper').classList.remove('hidden');
+                document.getElementById('pin-button-wrapper').classList.remove('hidden');
 
             } else {
-                if (readButtonWrapper) readButtonWrapper.classList.add('hidden');
-                if (pinButtonWrapper) pinButtonWrapper.classList.add('hidden');
+                document.getElementById('read-button-wrapper').classList.add('hidden');
+                document.getElementById('pin-button-wrapper').classList.add('hidden');
             }
 
             modal.classList.add('open');
@@ -421,39 +386,29 @@
 
         const closeModal = () => {
             modal.classList.remove('open');
-            const readButtonWrapper = document.getElementById('read-button-wrapper');
-            const pinButtonWrapper = document.getElementById('pin-button-wrapper');
-
-            if (readButtonWrapper) readButtonWrapper.classList.add('hidden');
-            if (pinButtonWrapper) pinButtonWrapper.classList.add('hidden');
             currentPoem = null;
         };
 
         const updateModalReadButton = (isRead) => {
             const toggleReadBtn = document.getElementById('toggle-read-btn');
             const readStatusText = document.getElementById('read-status-text');
-            const readIcon = document.getElementById('read-icon');
             if (!toggleReadBtn) return;
 
             if (isRead) {
                 toggleReadBtn.classList.remove('bg-gray-100', 'text-gray-700');
                 toggleReadBtn.classList.add('bg-sky-500', 'text-white');
                 readStatusText.textContent = 'Прочитано';
-                readIcon.classList.remove('text-gray-700');
-                readIcon.classList.add('text-white');
             } else {
                 toggleReadBtn.classList.remove('bg-sky-500', 'text-white');
                 toggleReadBtn.classList.add('bg-gray-100', 'text-gray-700');
                 readStatusText.textContent = 'Отметить как прочитанное';
-                readIcon.classList.remove('text-white');
-                readIcon.classList.add('text-gray-700');
             }
         }
 
         const handleToggleRead = async () => {
             if (!currentPoem) return;
 
-            const url = `{{ url_for('toggle_read') }}`;
+            const url = `{{ request.url_for('toggle_read') }}`;
 
             try {
                 const response = await fetch(url, {
@@ -465,8 +420,7 @@
                 if (response.ok) {
                     const data = await response.json();
 
-                    const isReadAfterAction = data.action === 'marked';
-                    if (isReadAfterAction) {
+                    if (data.action === 'marked') {
                         readPoemsTitles.add(currentPoem.title);
                     } else {
                         readPoemsTitles.delete(currentPoem.title);
@@ -487,28 +441,23 @@
         const updateModalPinButton = (isPinned) => {
             const togglePinBtn = document.getElementById('toggle-pin-btn');
             const pinStatusText = document.getElementById('pin-status-text');
-            const pinIcon = document.getElementById('pin-icon');
             if (!togglePinBtn) return;
 
             if (isPinned) {
                 togglePinBtn.classList.remove('bg-gray-100', 'text-gray-700');
                 togglePinBtn.classList.add('bg-orange-500', 'text-white');
                 pinStatusText.textContent = 'Изучаемый стих';
-                pinIcon.classList.remove('text-gray-700');
-                pinIcon.classList.add('text-white');
             } else {
                 togglePinBtn.classList.remove('bg-orange-500', 'text-white');
                 togglePinBtn.classList.add('bg-gray-100', 'text-gray-700');
                 pinStatusText.textContent = 'Закрепить для изучения';
-                pinIcon.classList.remove('text-white');
-                pinIcon.classList.add('text-gray-700');
             }
         }
 
         const handleTogglePin = async () => {
             if (!currentPoem) return;
 
-            const url = `{{ url_for('toggle_pin') }}`;
+            const url = `{{ request.url_for('toggle_pin') }}`;
 
             try {
                 const response = await fetch(url, {
@@ -519,17 +468,10 @@
 
                 if (response.ok) {
                     const data = await response.json();
-
-                    if (data.action === 'pinned') {
-                        pinnedPoemTitle = data.pinned_title;
-                    } else {
-                        pinnedPoemTitle = null;
-                    }
-
+                    pinnedPoemTitle = data.pinned_title;
                     updateModalPinButton(currentPoem.title === pinnedPoemTitle);
                     updateTabCounts();
                     filterAndRender();
-
                 } else {
                     const errorData = await response.json();
                     console.error('Ошибка при переключении закрепления:', errorData.message);
@@ -551,53 +493,38 @@
             });
         });
 
-        // Обработчики модального окна
         closeModalBtn.addEventListener('click', closeModal);
         if (isAuthenticated) {
-            const toggleReadBtn = document.getElementById('toggle-read-btn');
-            const togglePinBtn = document.getElementById('toggle-pin-btn');
-
-            if (toggleReadBtn) toggleReadBtn.addEventListener('click', handleToggleRead);
-            if (togglePinBtn) togglePinBtn.addEventListener('click', handleTogglePin);
+            document.getElementById('toggle-read-btn').addEventListener('click', handleToggleRead);
+            document.getElementById('toggle-pin-btn').addEventListener('click', handleTogglePin);
         }
 
         searchInput.addEventListener('input', filterAndRender);
 
-        // ОБНОВЛЕННЫЙ ОБРАБОТЧИК ДЛЯ КНОПОК СОРТИРОВКИ С ДИНАМИЧЕСКИМИ ИКОНКАМИ
         sortButtonsContainer.addEventListener('click', (e) => {
             const targetButton = e.target.closest('button.sort-btn');
             if (!targetButton) return;
 
             const newSortType = targetButton.dataset.sort;
-            let newSortOrder = targetButton.dataset.order;
-
-            // 1. Определяем новое направление сортировки (toggle если нажата та же кнопка)
             if (newSortType === currentSort.type) {
-                newSortOrder = currentSort.order === 'asc' ? 'desc' : 'asc';
+                currentSort.order = currentSort.order === 'asc' ? 'desc' : 'asc';
             } else {
-                newSortOrder = 'asc'; // Сбрасываем на ASC при смене типа
+                currentSort.type = newSortType;
+                currentSort.order = 'asc';
             }
 
-            currentSort.type = newSortType;
-            currentSort.order = newSortOrder;
+            targetButton.dataset.order = currentSort.order;
 
-            // 2. Обновляем data-order на кнопке
-            targetButton.dataset.order = newSortOrder;
-
-            // 3. Обновляем класс active
             const activeSort = sortButtonsContainer.querySelector('.active');
             if (activeSort) activeSort.classList.remove('active');
             targetButton.classList.add('active');
 
-            // 4. Обновляем ВСЕ иконки
             const allIcons = document.querySelectorAll('.sort-arrow-icon');
             allIcons.forEach(icon => {
                 if (icon.dataset.sortIcon === currentSort.type) {
-                    // Показываем и поворачиваем активную иконку
                     icon.style.opacity = 1;
                     icon.style.transform = currentSort.order === 'desc' ? 'rotate(180deg)' : 'rotate(0deg)';
                 } else {
-                    // Скрываем неактивные иконки
                     icon.style.opacity = 0;
                 }
             });
@@ -618,27 +545,16 @@
             }
         });
 
-        // Инициализация при загрузке страницы
         window.onload = () => {
-            // Добавляем счетчик строк в данные стихов
-            allPoems = allData.map(poem => ({
-                ...poem,
-                lineCount: poem.text.split('\n').length
-            }));
+            allPoems = allData;
 
-            // НОВОЕ: Скрыть/показать вкладку "Все" на основе настройки
             if (isAuthenticated) {
                 const unfilteredTab = document.getElementById('tab-unfiltered');
-                if (unfilteredTab) {
-                    if (showAllTabSetting) {
-                        unfilteredTab.classList.remove('hidden');
-                    } else {
-                        unfilteredTab.classList.add('hidden');
-                    }
+                if (unfilteredTab && showAllTabSetting) {
+                    unfilteredTab.classList.remove('hidden');
                 }
             }
 
-            // Начальная настройка иконок: показываем только иконку для текущего типа сортировки
             const allIcons = document.querySelectorAll('.sort-arrow-icon');
             allIcons.forEach(icon => {
                 if (icon.dataset.sortIcon === currentSort.type) {
@@ -649,12 +565,7 @@
                 }
             });
 
-
-            // Запускаем счетчики и отрисовку
             updateTabCounts();
             filterAndRender();
         };
     </script>
-</body>
-
-</html>

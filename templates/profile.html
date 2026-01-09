@@ -38,88 +38,39 @@
             <h1 class="text-3xl font-extrabold text-gray-800">
                 Привет, {{ current_user.username }}! 👋
             </h1>
-
-            <button id="settings-toggle-btn"
-                class="text-gray-500 hover:text-sky-600 transition-colors duration-200 p-2 -mr-2 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500">
-                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z">
-                    </path>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z">
-                    </path>
-                </svg>
-            </button>
         </div>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="mb-6 space-y-2">
-            {% for category, message in messages %}
-            <div
-                class="p-3 text-sm rounded-lg shadow-sm {{ 'bg-green-100 text-green-700' if category == 'success' else 'bg-red-100 text-red-700' if category == 'error' else 'bg-blue-100 text-blue-700' }}">
-                {{ message }}
-            </div>
-            {% endfor %}
+        
+        {% if success %}
+        <div class="mb-4 p-3 text-sm rounded-lg shadow-sm bg-green-100 text-green-700">
+            {{ success }}
         </div>
         {% endif %}
-        {% endwith %}
-
-        <div id="settings-forms-container" class="mb-6">
-
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Настройки Аккаунта</h2>
-
-            <div class="p-4 border border-gray-100 rounded-lg bg-gray-50">
-                <form method="POST" class="space-y-4">
-                    <input type="hidden" name="action" value="update_credentials">
-
-                    <h3 class="text-xl font-semibold text-gray-700 mb-4">Изменение Логина и Пароля</h3>
-
-                    <p class="text-sm text-gray-500">
-                        Текущий логин: <span class="font-medium text-gray-700">{{ current_user.username }}</span>.
-                    </p>
-
-                    <div class="mb-4">
-                        <label for="username_new" class="block text-sm font-medium text-gray-700 mb-1">
-                            Новый Логин (мин. 3 символа)
-                        </label>
-                        <input type="text" id="username_new" name="username_new"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 transition duration-150"
-                            placeholder="Введите новый логин">
-                    </div>
-
-                    <div class="pt-4 border-t border-gray-200">
-                        <label for="new_password" class="block text-sm font-medium text-gray-700 mb-1">Новый пароль
-                            (мин. 4 символа)</label>
-                        <input type="password" id="new_password" name="new_password"
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 transition duration-150"
-                            placeholder="Оставьте пустым, чтобы не менять">
-                    </div>
-
-                    <button type="submit"
-                        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 rounded-lg transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
-                        Сохранить Логин и Пароль
-                    </button>
-                </form>
-            </div>
+        {% if error %}
+        <div class="mb-4 p-3 text-sm rounded-lg shadow-sm bg-red-100 text-red-700">
+            {{ error }}
         </div>
+        {% endif %}
+
+
         <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">Личные Настройки</h2>
-        <form method="POST">
-            <input type="hidden" name="action" value="update_settings">
+        <form method="POST" action="{{ request.url_for('profile_post') }}">
+
+            <div class="mb-4">
+                <label for="new_password" class="block text-sm font-medium text-gray-700 mb-1">Новый пароль (мин. 4 символа)</label>
+                <input type="password" id="new_password" name="new_password"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-sky-500 focus:border-sky-500 transition duration-150"
+                    placeholder="Оставьте пустым, чтобы не менять">
+            </div>
 
             <div class="mb-6 p-4 border border-gray-100 rounded-lg bg-white shadow-sm">
-
                 <h3 class="text-xl font-semibold text-gray-700 mb-4">Видимость Вкладки</h3>
                 <div class="flex items-center mb-4">
                     <input id="show_all_tab" name="show_all_tab" type="checkbox" {{ 'checked' if show_all_tab else '' }}
-                        class="h-5 w-5 text-sky-600 border-gray-300 rounded focus:ring-sky-500">
+                        class="h-5 w-5 text-sky-600 border-gray-300 rounded focus:ring-sky-500" value="on">
                     <label for="show_all_tab" class="ml-3 text-sm font-medium text-gray-700">
                         Показывать вкладку "Все" (Все стихи)
                     </label>
                 </div>
-                <p class="text-xs text-gray-500 mt-1">По умолчанию отображается только вкладка "Непрочитанные" и
-                    "Прочитанные".</p>
             </div>
 
             <p class="text-sm font-semibold text-gray-700 mb-2">
@@ -137,47 +88,21 @@
 
             <button type="submit"
                 class="w-full bg-sky-500 hover:bg-sky-600 text-white font-semibold py-3 rounded-lg transition-colors duration-200 shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">
-                Сохранить заметки и настройки видимости
+                Сохранить настройки
             </button>
         </form>
 
         <div class="mt-8 pt-4 border-t border-gray-100 flex justify-between items-center">
-            <a href="{{ url_for('index') }}"
+            <a href="{{ request.url_for('read_root') }}"
                 class="text-sky-600 hover:text-sky-800 text-sm font-medium transition-colors">
                 ← На главную
             </a>
-            <a href="{{ url_for('logout') }}"
+            <a href="{{ request.url_for('logout') }}"
                 class="text-red-600 hover:text-red-800 text-sm font-medium transition-colors">
                 Выйти
             </a>
         </div>
     </div>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
-            const toggleButton = document.getElementById('settings-toggle-btn');
-            const settingsContainer = document.getElementById('settings-forms-container');
-
-            // Изначально контейнер скрыт с помощью CSS-класса
-            settingsContainer.classList.add('hidden');
-
-            toggleButton.addEventListener('click', () => {
-                if (settingsContainer.classList.contains('hidden')) {
-                    // Показать
-                    settingsContainer.classList.remove('hidden');
-                    // Добавляем класс open, чтобы запустить анимацию max-height
-                    settingsContainer.classList.add('open');
-                } else {
-                    // Скрыть
-                    settingsContainer.classList.remove('open');
-                    // Ждем завершения анимации, прежде чем полностью скрыть
-                    setTimeout(() => {
-                        settingsContainer.classList.add('hidden');
-                    }, 300); // 300ms соответствует transition duration в CSS
-                }
-            });
-        });
-    </script>
 </body>
 
 </html>

@@ -1,7 +1,11 @@
-Flask
-Flask-SQLAlchemy
-Flask-Login
-Werkzeug
+fastapi
+uvicorn
+python-multipart
+jinja2
+pydantic
+PyJWT
+python-jose[cryptography]
+passlib[bcrypt]
 gunicorn
-psycopg2-binary
-markdown
+supabase
+python-dotenv

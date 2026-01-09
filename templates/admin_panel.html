@@ -46,22 +46,11 @@
         <header class="flex flex-col sm:flex-row justify-between items-center py-4 mb-8 border-b border-gray-200">
             <h1 class="text-3xl font-extrabold text-red-600 mb-4 sm:mb-0">Панель Управления Стихами</h1>
             <nav class="flex items-center space-x-4">
-                <a href="{{ url_for('index') }}" class="text-sky-500 hover:text-sky-600 font-semibold">← На главную</a>
+                <a href="{{ request.url_for('read_root') }}" class="text-sky-500 hover:text-sky-600 font-semibold">← На главную</a>
             </nav>
         </header>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div id="flash-messages" class="mb-4 space-y-2">
-            {% for category, message in messages %}
-            <div
-                class="p-3 text-sm rounded-lg shadow-sm {{ 'bg-green-100 text-green-700' if category == 'success' else 'bg-red-100 text-red-700' }}">
-                {{ message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-        {% endwith %}
+        
+        <div id="flash-messages" class="mb-4 space-y-2"></div>
 
         <div class="mb-8 p-6 bg-white rounded-xl shadow-lg border border-gray-200">
             <div class="flex flex-col md:flex-row justify-between items-center mb-4">
@@ -147,7 +136,7 @@
     <script>
         let allPoems = [];
         let filteredPoems = [];
-        let isEditing = false; // Флаг для модального окна: true - редактирование, false - добавление
+        let isEditing = false; 
         let currentSort = { type: 'title', order: 'asc' };
 
         const searchInput = document.getElementById('search-input');
@@ -160,9 +149,6 @@
         const modalError = document.getElementById('modal-error');
         const originalTitleInput = document.getElementById('original-title');
 
-
-        // --- UI ХЕЛПЕРЫ ---
-
         function showMessage(message, category = 'success') {
             const container = document.getElementById('flash-messages');
             if (!container) return;
@@ -172,7 +158,6 @@
             div.textContent = message;
             container.prepend(div);
 
-            // Автоматическое исчезновение через 5 секунд
             setTimeout(() => div.remove(), 5000);
         }
 
@@ -194,7 +179,7 @@
                 document.getElementById('title').value = poem.title;
                 document.getElementById('author').value = poem.author;
                 document.getElementById('text').value = poem.text;
-                originalTitleInput.value = poem.title; // Сохраняем оригинальный заголовок
+                originalTitleInput.value = poem.title;
             } else {
                 isEditing = false;
                 modalHeading.textContent = 'Добавить Новый Стих 📝';
@@ -205,9 +190,6 @@
             modal.classList.add('open');
         }
 
-
-        // --- ФУНКЦИИ ТАБЛИЦЫ ---
-
         function createTableRow(poem) {
             const tr = document.createElement('tr');
             tr.className = 'hover:bg-gray-50';
@@ -216,7 +198,7 @@
             tr.innerHTML = `
                 <td class="px-4 py-3 font-medium text-gray-900 break-words">${poem.title}</td>
                 <td class="px-4 py-3 text-gray-700">${poem.author}</td>
-                <td class="px-4 py-3 text-gray-700 text-center">${poem.lineCount}</td>
+                <td class="px-4 py-3 text-gray-700 text-center">${poem.line_count}</td>
                 <td class="px-4 py-3 text-center whitespace-nowrap">
                     <button data-title="${poem.title}" data-action="edit"
                         class="text-yellow-600 hover:text-yellow-800 font-semibold px-3 py-1 rounded-lg transition-colors duration-150 text-sm">
@@ -236,9 +218,9 @@
                 let valA, valB;
 
                 if (currentSort.type === 'length') {
-                    valA = a.lineCount;
-                    valB = b.lineCount;
-                } else { // title or author
+                    valA = a.line_count;
+                    valB = b.line_count;
+                } else {
                     valA = a[currentSort.type].toLowerCase();
                     valB = b[currentSort.type].toLowerCase();
                 }
@@ -263,7 +245,7 @@
         }
 
         function filterAndRender() {
-            const searchText = searchInput.value.toLowerCase();
+            const searchText = searchInput.value.toLowerCase().trim();
 
             filteredPoems = allPoems.filter(poem => {
                 return poem.title.toLowerCase().includes(searchText) ||
@@ -275,11 +257,9 @@
             renderTable(sortedPoems);
         }
 
-        // --- ЗАГРУЗКА ДАННЫХ ---
-
         async function loadPoems() {
             try {
-                const response = await fetch("{{ url_for('get_all_poems_api') }}");
+                const response = await fetch("{{ request.url_for('get_all_poems_api') }}");
                 if (!response.ok) {
                     throw new Error('Не удалось загрузить стихи.');
                 }
@@ -292,8 +272,6 @@
             }
         }
 
-        // --- AJAX CRUD ОПЕРАЦИИ ---
-
         async function handleSubmit(event) {
             event.preventDefault();
             modalError.classList.add('hidden');
@@ -305,6 +283,8 @@
             const originalTitle = originalTitleInput.value;
 
             if (!title || !author || !text) {
+                modalError.textContent = 'Все поля должны быть заполнены.';
+                modalError.classList.remove('hidden');
                 modalSubmitBtn.disabled = false;
                 return;
             }
@@ -312,16 +292,16 @@
             let url, method;
 
             if (isEditing) {
-                // РЕДАКТИРОВАНИЕ
-                url = `{{ url_for('edit_poem', title='TEMP') }}`.replace('TEMP', encodeURIComponent(originalTitle));
+                url = "{{ request.url_for('edit_poem_post', original_title='TEMP') }}".replace('TEMP', encodeURIComponent(originalTitle));
+                method = 'POST';
             } else {
-                // ДОБАВЛЕНИЕ
-                url = `{{ url_for('add_poem') }}`;
+                url = "{{ request.url_for('add_poem_post') }}";
+                method = 'POST';
             }
 
             try {
                 const response = await fetch(url, {
-                    method: 'POST', // Используем POST, но сервер будет знать, что это AJAX (JSON)
+                    method: method,
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ title, author, text })
                 });
@@ -332,20 +312,15 @@
                     const newPoem = data.poem;
 
                     if (isEditing) {
-                        // 1. Находим и удаляем старую запись
                         allPoems = allPoems.filter(p => p.title !== originalTitle);
-                        // 2. Добавляем обновленную запись
-                        allPoems.push(newPoem);
-                    } else {
-                        // Добавление: просто добавляем новый стих
-                        allPoems.push(newPoem);
                     }
+                    allPoems.push(newPoem);
 
                     showMessage(data.message, 'success');
                     closeModal();
-                    filterAndRender(); // Перерисовываем таблицу
+                    filterAndRender();
                 } else {
-                    modalError.textContent = data.message || 'Произошла ошибка на сервере.';
+                    modalError.textContent = data.detail || 'Произошла ошибка на сервере.';
                     modalError.classList.remove('hidden');
                 }
             } catch (error) {
@@ -370,24 +345,21 @@
                 });
 
                 if (response.ok) {
-                    allPoems = allPoems.filter(p => p.title !== title); // Удаляем из локального массива
+                    allPoems = allPoems.filter(p => p.title !== title);
                     showMessage(`Стих "${title}" успешно удален.`, 'success');
-                    filterAndRender(); // Перерисовываем таблицу
+                    filterAndRender();
                 } else {
                     const errorData = await response.json();
-                    showMessage(`Ошибка при удалении: ${errorData.message}`, 'error');
+                    showMessage(`Ошибка при удалении: ${errorData.detail}`, 'error');
                 }
             } catch (error) {
                 showMessage('Сетевая ошибка при удалении.', 'error');
             }
         }
 
-        // --- ИНИЦИАЛИЗАЦИЯ ---
-
         window.onload = () => {
             loadPoems();
 
-            // Обработчики событий
             document.getElementById('add-new-poem-btn').addEventListener('click', () => openModal());
             document.getElementById('close-modal-btn').addEventListener('click', closeModal);
             modal.addEventListener('click', (event) => {
@@ -400,7 +372,6 @@
             searchInput.addEventListener('input', filterAndRender);
             modalForm.addEventListener('submit', handleSubmit);
 
-            // Обработчик кнопок таблицы (редактирование/удаление)
             poemsTableBody.addEventListener('click', (e) => {
                 const targetBtn = e.target.closest('button[data-action]');
                 if (!targetBtn) return;
@@ -415,30 +386,24 @@
                 }
             });
 
-            // Обработчик сортировки заголовков
             document.querySelectorAll('.sortable').forEach(header => {
                 header.addEventListener('click', () => {
                     const sortType = header.dataset.sort;
                     let sortOrder = header.dataset.order;
 
-                    // Если сортируем по тому же столбцу, меняем порядок
                     if (currentSort.type === sortType) {
                         sortOrder = (currentSort.order === 'asc' || currentSort.order === 'none') ? 'desc' : 'asc';
                     } else {
-                        // Если новый столбец, устанавливаем asc по умолчанию
                         sortOrder = 'asc';
                     }
 
-                    // Обновляем текущее состояние сортировки
                     currentSort = { type: sortType, order: sortOrder };
 
-                    // Обновляем UI для всех заголовков
                     document.querySelectorAll('.sortable').forEach(h => {
-                        h.dataset.order = 'none'; // Сброс для всех
+                        h.dataset.order = 'none';
                         h.querySelector('span') && h.querySelector('span').remove();
                     });
 
-                    // Устанавливаем новый порядок и метку для текущего заголовка
                     header.dataset.order = sortOrder;
                     const orderSymbol = sortOrder === 'asc' ? '▲' : '▼';
                     const orderSpan = document.createElement('span');
